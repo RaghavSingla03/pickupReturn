@@ -15,9 +15,12 @@ class DriverProfileTab extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        children: [
+      child: RefreshIndicator(
+        onRefresh: auth.refreshUser,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          children: [
           const Text('Profile',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 20),
@@ -130,7 +133,8 @@ class DriverProfileTab extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

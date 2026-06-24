@@ -43,6 +43,23 @@ class AuthProvider extends ChangeNotifier {
   bool get isDriver => user?.role == 'driver';
   bool get isShipper => user?.role == 'shipper';
 
+  /// Re-fetches the current user. Safe to call from pull-to-refresh:
+  /// unlike [bootstrap] it never clears the token on failure.
+  Future<void> refreshUser() async {
+    final token = await ApiClient.instance.getToken();
+    if (token == null) return;
+    try {
+      final r = await ApiClient.instance.dio.get('/auth/me');
+      if (r.statusCode == 200 && r.data is Map) {
+        final m = Map<String, dynamic>.from(r.data);
+        user = AppUser.fromJson(Map<String, dynamic>.from(m['user'] ?? m));
+        notifyListeners();
+      }
+    } catch (_) {
+      // ignore transient errors on refresh
+    }
+  }
+
   Future<void> bootstrap() async {
     final token = await ApiClient.instance.getToken();
     if (token == null) {
@@ -138,6 +155,13 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
     await ApiClient.instance.clearToken();
     user = null;
+    notifyListeners();
+  }
+
+  void handleSessionExpired() {
+    if (user == null) return;
+    user = null;
+    loading = false;
     notifyListeners();
   }
 }
