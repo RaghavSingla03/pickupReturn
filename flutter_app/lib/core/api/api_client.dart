@@ -8,6 +8,8 @@ class ApiClient {
   late final Dio _dio;
   static final ApiClient instance = ApiClient._();
 
+  void Function()? onUnauthorized;
+
   ApiClient._() {
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
@@ -23,13 +25,31 @@ class ApiClient {
         if (token != null) options.headers['Authorization'] = 'Bearer $token';
         handler.next(options);
       },
+      onResponse: (response, handler) {
+        if (response.statusCode == 401 && !_isAuthPath(response.requestOptions.path)) {
+          _handleUnauthorized();
+        }
+        handler.next(response);
+      },
       onError: (e, handler) {
-        if (e.response?.statusCode == 401) {
-          _storage.delete(key: 'access_token');
+        if (e.response?.statusCode == 401 && !_isAuthPath(e.requestOptions.path)) {
+          _handleUnauthorized();
         }
         handler.next(e);
       },
     ));
+  }
+
+  bool _isAuthPath(String path) =>
+      path.contains('/auth/login') ||
+      path.contains('/auth/register') ||
+      path.contains('/auth/send-otp') ||
+      path.contains('/auth/forgot-password') ||
+      path.contains('/auth/reset-password');
+
+  void _handleUnauthorized() {
+    _storage.delete(key: 'access_token');
+    onUnauthorized?.call();
   }
 
   Dio get dio => _dio;

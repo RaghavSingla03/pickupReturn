@@ -23,7 +23,7 @@ function internalError(res, err, ctx) {
 }
 
 function issueAccessToken(user) {
-  return jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 }
 
 async function issueRefreshToken(userId) {
