@@ -5,14 +5,22 @@ import pool from '../db/db.js';
  * Survives server restarts — counters are persisted in the rate_limits table.
  */
 export class PgRateLimitStore {
-  constructor(windowMs) {
+  // prefix keeps limiters from sharing counters — without it every limiter
+  // keyed by the same IP increments the same row.
+  constructor(windowMs, prefix = '') {
     this.windowMs = windowMs;
+    this.keyPrefix = prefix;
     // Clean up expired rows every 5 minutes
     this._cleanupInterval = setInterval(() => this._cleanup(), 5 * 60 * 1000);
     if (this._cleanupInterval.unref) this._cleanupInterval.unref();
   }
 
+  _key(key) {
+    return this.keyPrefix + key;
+  }
+
   async get(key) {
+    key = this._key(key);
     try {
       const { rows: [row] } = await pool.query(
         'SELECT hits, expires_at FROM rate_limits WHERE key = $1',
@@ -30,6 +38,7 @@ export class PgRateLimitStore {
   }
 
   async increment(key) {
+    key = this._key(key);
     const expiresAt = new Date(Date.now() + this.windowMs);
     const { rows: [row] } = await pool.query(
       `INSERT INTO rate_limits (key, hits, expires_at)
@@ -50,6 +59,7 @@ export class PgRateLimitStore {
   }
 
   async decrement(key) {
+    key = this._key(key);
     await pool.query(
       'UPDATE rate_limits SET hits = GREATEST(hits - 1, 0) WHERE key = $1 AND expires_at > NOW()',
       [key]
@@ -57,7 +67,7 @@ export class PgRateLimitStore {
   }
 
   async resetKey(key) {
-    await pool.query('DELETE FROM rate_limits WHERE key = $1', [key]);
+    await pool.query('DELETE FROM rate_limits WHERE key = $1', [this._key(key)]);
   }
 
   async resetAll() {

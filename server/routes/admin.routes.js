@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { authenticate, authorizeRole } from '../middleware/auth.middleware.js';
+import { PgRateLimitStore } from '../stores/rateLimitStore.js';
 import {
   adminLogin,
   getDashboard,
@@ -13,8 +15,19 @@ import { getAdminSettings, updateSettings, testEmailEndpoint } from '../controll
 
 const router = Router();
 
+// Brute-force guard for the admin account. Applied unconditionally — the
+// security_rate_limit DB kill-switch must never disable this one.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  store: new PgRateLimitStore(15 * 60 * 1000, 'admin-login:'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+});
+
 // Public: admin login
-router.post('/login', adminLogin);
+router.post('/login', adminLoginLimiter, adminLogin);
 
 // All routes below require a valid admin JWT
 router.use(authenticate);

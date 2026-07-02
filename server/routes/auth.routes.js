@@ -27,7 +27,7 @@ function conditionalLimit(limiter) {
 const otpLimiter = conditionalLimit(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  store: new PgRateLimitStore(15 * 60 * 1000),
+  store: new PgRateLimitStore(15 * 60 * 1000, 'otp:'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many OTP requests. Try again in 15 minutes.' },
@@ -36,7 +36,7 @@ const otpLimiter = conditionalLimit(rateLimit({
 const loginLimiter = conditionalLimit(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  store: new PgRateLimitStore(15 * 60 * 1000),
+  store: new PgRateLimitStore(15 * 60 * 1000, 'login:'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Try again in 15 minutes.' },
@@ -45,7 +45,7 @@ const loginLimiter = conditionalLimit(rateLimit({
 const registerLimiter = conditionalLimit(rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  store: new PgRateLimitStore(60 * 60 * 1000),
+  store: new PgRateLimitStore(60 * 60 * 1000, 'register:'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many registrations from this IP. Try again later.' },
