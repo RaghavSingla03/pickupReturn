@@ -38,28 +38,50 @@ export async function createBooking(req, res) {
       return res.status(400).json({ error: `Insufficient available space. You have ${effectiveCapacity} tons free; this load needs ${load.weight_tons} tons.` });
     }
 
-    const { rows: [newBooking] } = await pool.query(
-      'INSERT INTO bookings (load_id, driver_id, shipper_id, agreed_price) VALUES ($1,$2,$3,$4) RETURNING *',
-      [load_id, req.user.id, load.user_id, priceNum]
-    );
+    // Claim the load atomically inside a transaction so two drivers can't
+    // book it at the same time — the conditional UPDATE succeeds for only one.
+    const client = await pool.connect();
+    let newBooking;
+    try {
+      await client.query('BEGIN');
 
-    await pool.query("UPDATE loads SET status = 'booked' WHERE id = $1", [load_id]);
+      const { rows: [claimed] } = await client.query(
+        "UPDATE loads SET status = 'booked' WHERE id = $1 AND status = 'open' RETURNING id",
+        [load_id]
+      );
+      if (!claimed) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'This load was just booked by another driver.' });
+      }
 
-    // LTL: if driver declared partial capacity, deduct and keep active if space remains.
-    // Otherwise (full truck), mark matched immediately.
-    if (activeAvail?.available_capacity_tons !== null && activeAvail?.available_capacity_tons !== undefined) {
-      await pool.query(
-        `UPDATE driver_availability
-         SET available_capacity_tons = GREATEST(0, available_capacity_tons - $1),
-             status = CASE WHEN available_capacity_tons - $1 <= 0 THEN 'matched' ELSE 'active' END
-         WHERE user_id = $2 AND status = 'active'`,
-        [load.weight_tons, req.user.id]
-      );
-    } else {
-      await pool.query(
-        "UPDATE driver_availability SET status = 'matched' WHERE user_id = $1 AND status = 'active'",
-        [req.user.id]
-      );
+      ({ rows: [newBooking] } = await client.query(
+        'INSERT INTO bookings (load_id, driver_id, shipper_id, agreed_price) VALUES ($1,$2,$3,$4) RETURNING *',
+        [load_id, req.user.id, load.user_id, priceNum]
+      ));
+
+      // LTL: if driver declared partial capacity, deduct and keep active if space remains.
+      // Otherwise (full truck), mark matched immediately.
+      if (activeAvail?.available_capacity_tons !== null && activeAvail?.available_capacity_tons !== undefined) {
+        await client.query(
+          `UPDATE driver_availability
+           SET available_capacity_tons = GREATEST(0, available_capacity_tons - $1),
+               status = CASE WHEN available_capacity_tons - $1 <= 0 THEN 'matched' ELSE 'active' END
+           WHERE user_id = $2 AND status = 'active'`,
+          [load.weight_tons, req.user.id]
+        );
+      } else {
+        await client.query(
+          "UPDATE driver_availability SET status = 'matched' WHERE user_id = $1 AND status = 'active'",
+          [req.user.id]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw txErr;
+    } finally {
+      client.release();
     }
 
     const { rows: [booking] } = await pool.query(`
