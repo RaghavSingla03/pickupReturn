@@ -130,6 +130,11 @@ app.use(cors({
   credentials: true,
 }));
 
+// Never write auth tokens (?t=, ?st=, legacy ?access_token=) into access logs
+morgan.token('url', (req) =>
+  (req.originalUrl || req.url).replace(/([?&](?:access_token|st|t)=)[^&]+/g, '$1[redacted]')
+);
+
 // In dev: pretty colours in terminal. In prod: combined format to both terminal AND file.
 if (isProd) {
   app.use(morgan('combined', { stream: accessLogStream() })); // file

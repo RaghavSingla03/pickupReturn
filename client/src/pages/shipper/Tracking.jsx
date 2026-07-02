@@ -33,30 +33,45 @@ export default function Tracking() {
       return () => clearInterval(interval);
     }
 
+    // SSE needs a token in the URL (EventSource can't set headers), so use a
+    // short-lived stream token scoped to this booking instead of the real JWT.
     const apiBase = import.meta.env.VITE_API_URL || '/api';
-    const es = new EventSource(`${apiBase}/bookings/${uuid}/track/stream?access_token=${encodeURIComponent(token)}`);
+    let es = null;
     let pollInterval = null;
+    let cancelled = false;
 
-    es.addEventListener('tracking', (e) => {
-      const update = JSON.parse(e.data);
-      setTracking((prev) => [update, ...prev]);
-      setLastUpdated(Date.now());
-    });
-
-    es.addEventListener('status', () => {
-      fetchBooking();
-    });
-
-    es.onerror = () => {
-      // Stream broke — close it and fall back to polling
-      es.close();
-      if (!pollInterval) {
-        pollInterval = setInterval(fetchBooking, 15000);
-      }
+    const startPolling = () => {
+      if (!pollInterval) pollInterval = setInterval(fetchBooking, 15000);
     };
 
+    api.get(`/bookings/${uuid}/stream-token`)
+      .then(({ token: streamToken }) => {
+        if (cancelled) return;
+        es = new EventSource(`${apiBase}/bookings/${uuid}/track/stream?st=${encodeURIComponent(streamToken)}`);
+
+        es.addEventListener('tracking', (e) => {
+          const update = JSON.parse(e.data);
+          setTracking((prev) => [update, ...prev]);
+          setLastUpdated(Date.now());
+        });
+
+        es.addEventListener('status', () => {
+          fetchBooking();
+        });
+
+        es.onerror = () => {
+          // Stream broke — close it and fall back to polling
+          es.close();
+          startPolling();
+        };
+      })
+      .catch(() => {
+        if (!cancelled) startPolling();
+      });
+
     return () => {
-      es.close();
+      cancelled = true;
+      if (es) es.close();
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [booking?.status, uuid]);

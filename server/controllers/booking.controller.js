@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import pool from '../db/db.js';
 import {
   sendBookingCreatedToShipper,
@@ -235,6 +236,30 @@ export async function addTrackingUpdate(req, res) {
     broadcast(booking.id, 'tracking', update);
   } catch (err) {
     return serverError(res, err, 'booking:addTracking');
+  }
+}
+
+// Mint a short-lived token scoped to one booking's SSE stream, so browsers
+// don't have to put their long-lived access token in the URL.
+export async function issueStreamToken(req, res) {
+  try {
+    const { rows: [booking] } = await pool.query(
+      'SELECT driver_id, shipper_id FROM bookings WHERE uuid = $1',
+      [req.params.uuid]
+    );
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' });
+    if (booking.driver_id !== req.user.id && booking.shipper_id !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized.' });
+    }
+
+    const token = jwt.sign(
+      { id: req.user.id, role: req.user.role, scope: 'stream', uuid: req.params.uuid },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+    res.json({ token, expires_in: 900 });
+  } catch (err) {
+    return serverError(res, err, 'booking:streamToken');
   }
 }
 

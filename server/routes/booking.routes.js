@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { authenticate, authorizeRole } from '../middleware/auth.middleware.js';
+import { authenticate, authenticateStream, authorizeRole } from '../middleware/auth.middleware.js';
 import {
   createBooking, updateBookingStatus, getBookingById,
-  addTrackingUpdate, streamTracking, rateBooking, getShipperBookings,
+  addTrackingUpdate, streamTracking, issueStreamToken, rateBooking, getShipperBookings,
 } from '../controllers/booking.controller.js';
 
 const router = Router();
@@ -12,7 +12,8 @@ router.get('/shipper', authenticate, authorizeRole('shipper'), getShipperBooking
 router.get('/:uuid', authenticate, getBookingById);
 router.put('/:uuid/status', authenticate, updateBookingStatus);
 router.post('/:uuid/track', authenticate, authorizeRole('driver'), addTrackingUpdate);
-router.get('/:uuid/track/stream', authenticate, streamTracking);
+router.get('/:uuid/stream-token', authenticate, issueStreamToken);
+router.get('/:uuid/track/stream', authenticateStream, streamTracking);
 router.post('/:uuid/rate', authenticate, rateBooking);
 
 export default router;
