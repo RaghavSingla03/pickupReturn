@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/AdminLayout.jsx';
 import { useAdminApi } from '../../hooks/useAdminApi.js';
+import { useFileToken } from '../../hooks/useFileToken.js';
 import {
   ShieldCheck, Clock, XCircle, CheckCircle, ChevronDown, ChevronUp,
   FileText, Truck, Phone, Hash, Weight, MapPin, Eye, AlertTriangle, Search, History,
@@ -26,10 +27,10 @@ const BACKEND = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
   : '';
 
-function docUrl(file_url) { return `${BACKEND}${file_url}`; }
-
 export default function AdminDriverVerification() {
   const api = useAdminApi();
+  const fileToken = useFileToken('adminToken');
+  const docUrl = (file_url) => `${BACKEND}${file_url}${fileToken ? `?t=${fileToken}` : ''}`;
   const [tab, setTab]           = useState('pending');
   const [search, setSearch]     = useState('');
   const [drivers, setDrivers]   = useState([]);

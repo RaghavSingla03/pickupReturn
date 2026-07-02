@@ -1,11 +1,18 @@
 import multer from 'multer';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 import pool from '../db/db.js';
 import { serverError } from '../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const JWT_SECRET = process.env.JWT_SECRET;
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+
+// Doc types only the owner or an admin may view. Vehicle photos are shown to
+// shippers on match cards, so they stay visible to any authenticated user.
+const SENSITIVE_DOC_TYPES = ['RC', 'permit', 'insurance', 'PUC', 'licence'];
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
 const ALLOWED_MIMETYPES  = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -70,6 +77,72 @@ export async function getUserDocuments(req, res) {
     res.json({ documents });
   } catch (err) {
     return serverError(res, err, 'upload:getUserDocs');
+  }
+}
+
+// Short-lived token so <img>/<a> tags (which cannot send headers) can load files
+export function issueFileToken(req, res) {
+  const token = jwt.sign(
+    { id: req.user.id, role: req.user.role, scope: 'files' },
+    JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  res.json({ token, expires_in: 900 });
+}
+
+function fileRequester(req) {
+  const authHeader = req.headers.authorization;
+  try {
+    if (authHeader?.startsWith('Bearer ')) {
+      return jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    }
+    if (req.query.t) {
+      const decoded = jwt.verify(req.query.t, JWT_SECRET);
+      return decoded.scope === 'files' ? decoded : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+// Authenticated replacement for the old public express.static('/uploads') mount
+export async function serveUploadedFile(req, res) {
+  try {
+    const filename = path.basename(req.params.filename); // strips any path traversal
+    const fileUrl = `/uploads/${filename}`;
+
+    // Branding files must stay public — the login page shows them pre-auth
+    const { rows: branding } = await pool.query(
+      "SELECT value FROM settings WHERE key IN ('logo_url', 'favicon_url')"
+    );
+    if (branding.some(r => r.value === fileUrl)) {
+      return res.sendFile(path.join(uploadsDir, filename));
+    }
+
+    const requester = fileRequester(req);
+    if (!requester) return res.status(401).json({ error: 'Authentication required.' });
+
+    const { rows: [doc] } = await pool.query(
+      'SELECT user_id, doc_type FROM documents WHERE file_url = $1',
+      [fileUrl]
+    );
+
+    const isAdmin = requester.role === 'admin';
+    const isOwner = doc
+      ? doc.user_id === requester.id
+      : filename.startsWith(`${requester.id}-`); // orphaned file: fall back to filename prefix
+    const isVehiclePhoto = doc && !SENSITIVE_DOC_TYPES.includes(doc.doc_type);
+
+    if (!isAdmin && !isOwner && !isVehiclePhoto) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    res.sendFile(path.join(uploadsDir, filename), err => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'File not found.' });
+    });
+  } catch (err) {
+    return serverError(res, err, 'upload:serveFile');
   }
 }
 

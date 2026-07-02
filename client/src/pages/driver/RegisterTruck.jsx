@@ -6,6 +6,7 @@ const BACKEND = import.meta.env.VITE_API_URL
 
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi.js';
+import { useFileToken } from '../../hooks/useFileToken.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
   Truck, Hash, MapPin, Weight, CheckCircle, Upload, FileText,
@@ -36,6 +37,8 @@ export default function RegisterTruck() {
   const api      = useApi();
   const { user, fetchUser } = useAuth();
   const navigate = useNavigate();
+  const fileToken = useFileToken();
+  const savedUrl  = (file_url) => `${BACKEND}${file_url}${fileToken ? `?t=${fileToken}` : ''}`;
 
   const isEditing      = !!user?.truck;
   const isVerified     = user?.truck?.is_verified === 1;
@@ -173,7 +176,7 @@ export default function RegisterTruck() {
     const hasFile     = !!saved || !!stagedFile;
 
     const thumbSrc = isPhoto
-      ? (previewUrl || (saved ? `${BACKEND}${saved.file_url}` : null))
+      ? (previewUrl || (saved ? savedUrl(saved.file_url) : null))
       : null;
 
     return (
@@ -212,7 +215,7 @@ export default function RegisterTruck() {
           {/* View saved file */}
           {saved && !stagedFile && (
             <a
-              href={`${BACKEND}${saved.file_url}`}
+              href={savedUrl(saved.file_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-100"

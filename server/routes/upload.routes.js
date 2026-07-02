@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { upload, uploadDocument, getUserDocuments } from '../controllers/upload.controller.js';
+import { upload, uploadDocument, getUserDocuments, issueFileToken } from '../controllers/upload.controller.js';
 
 const router = Router();
+
+router.get('/token', authenticate, issueFileToken);
 
 router.post('/', authenticate, (req, res, next) => {
   upload.single('file')(req, res, err => {

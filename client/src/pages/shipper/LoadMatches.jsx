@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi.js';
+import { useFileToken } from '../../hooks/useFileToken.js';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import RatingStars from '../../components/RatingStars.jsx';
 import { ArrowLeft, Truck, MapPin, ArrowRight, Send, X, Camera, Hash, Weight, Home, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -17,6 +18,8 @@ const PHOTO_LABEL = { vehicle_front: 'Front View', vehicle_left: 'Left Side', ve
 function PhotoStrip({ photos }) {
   const trackRef = useRef(null);
   const [current, setCurrent] = useState(0);
+  const fileToken = useFileToken();
+  const photoUrl = (file_url) => `${BACKEND}${file_url}${fileToken ? `?t=${fileToken}` : ''}`;
 
   // Auto-advance every 3s
   useEffect(() => {
@@ -54,13 +57,13 @@ function PhotoStrip({ photos }) {
         {photos.map((p, i) => (
           <a
             key={p.doc_type}
-            href={`${BACKEND}${p.file_url}`}
+            href={photoUrl(p.file_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="shrink-0 w-full h-full relative"
           >
             <img
-              src={`${BACKEND}${p.file_url}`}
+              src={photoUrl(p.file_url)}
               alt={PHOTO_LABEL[p.doc_type]}
               className="w-full h-full object-cover"
             />

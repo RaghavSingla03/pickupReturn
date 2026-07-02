@@ -17,6 +17,7 @@ import uploadRoutes   from './routes/upload.routes.js';
 import adminRoutes    from './routes/admin.routes.js';
 import settingsRoutes      from './routes/settings.routes.js';
 import notificationRoutes  from './routes/notification.routes.js';
+import { serveUploadedFile } from './controllers/upload.controller.js';
 
 // ── Environment validation (fail-fast on misconfiguration) ───────────────────
 const PLACEHOLDER_SECRETS = new Set([
@@ -162,8 +163,9 @@ app.use('/api/loads',           writeLimiter);
 app.use('/api/bookings',        writeLimiter);
 app.use('/api/drivers/availability', writeLimiter);
 
-// Static uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Uploaded files — auth required (owner/admin for documents, any logged-in user
+// for vehicle photos, public only for branding). See upload.controller.js.
+app.get('/uploads/:filename', serveUploadedFile);
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);
