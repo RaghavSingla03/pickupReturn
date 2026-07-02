@@ -289,7 +289,10 @@ export async function resetPassword(req, res) {
     if (!user) return res.status(404).json({ error: 'Account not found.' });
 
     const password_hash = bcrypt.hashSync(password, 10);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [password_hash, user.id]);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, password_changed_at = NOW() WHERE id = $2',
+      [password_hash, user.id]
+    );
 
     // Clean up OTP and invalidate all existing sessions
     await Promise.all([

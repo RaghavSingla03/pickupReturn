@@ -15,9 +15,17 @@ export async function authenticate(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const { rows: [user] } = await pool.query('SELECT is_active FROM users WHERE id = $1', [decoded.id]);
+    const { rows: [user] } = await pool.query(
+      'SELECT is_active, password_changed_at FROM users WHERE id = $1',
+      [decoded.id]
+    );
     if (!user || user.is_active === 0) {
       return res.status(403).json({ error: 'Account suspended. Contact admin.' });
+    }
+    // Reject tokens issued before the last password reset — a stolen token
+    // must die when the owner resets their password. (iat is in seconds.)
+    if (user.password_changed_at && decoded.iat * 1000 < new Date(user.password_changed_at).getTime()) {
+      return res.status(401).json({ error: 'Session expired. Please log in again.' });
     }
 
     req.user = decoded;

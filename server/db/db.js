@@ -94,6 +94,8 @@ async function runMigrations() {
     )
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_verif_history_driver ON verification_history(driver_id, created_at DESC)');
+  // Access tokens issued before a password reset are rejected (see auth.middleware.js)
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ');
   // Add uuid to bookings for non-guessable public URLs
   await pool.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS uuid UUID DEFAULT gen_random_uuid()');
   await pool.query("UPDATE bookings SET uuid = gen_random_uuid() WHERE uuid IS NULL");
