@@ -1,22 +1,23 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import axios from "axios";
+import { refreshAccessToken } from "../lib/refreshToken.js";
 
 const AuthContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 // Decode JWT payload without verifying signature (browser-side, safe for expiry check only)
 function decodeToken(token) {
   try {
-    return JSON.parse(atob(token.split('.')[1]));
+    return JSON.parse(atob(token.split(".")[1]));
   } catch {
     return null;
   }
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser]   = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
   const refreshTimerRef = useRef(null);
 
@@ -32,11 +33,9 @@ export function AuthProvider({ children }) {
 
   async function silentRefresh() {
     try {
-      const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-      const newToken = res.data.token;
-      localStorage.setItem('token', newToken);
+      const newToken = await refreshAccessToken();
       setToken(newToken);
-      scheduleRefresh(newToken);
+      //scheduleRefresh(newToken);
     } catch {
       // Refresh token expired or invalid — force logout
       _clearAuth();
@@ -45,7 +44,7 @@ export function AuthProvider({ children }) {
 
   function _clearAuth() {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setToken(null);
     setUser(null);
   }
@@ -53,11 +52,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (token) {
       fetchUser();
-      scheduleRefresh(token);
+      //scheduleRefresh(token);
     } else {
       setLoading(false);
     }
-    return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); };
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
   }, []);
 
   async function fetchUser() {
@@ -71,9 +72,7 @@ export function AuthProvider({ children }) {
       if (err.response?.status === 401) {
         // Access token expired — try refresh once
         try {
-          const refreshRes = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-          const newToken = refreshRes.data.token;
-          localStorage.setItem('token', newToken);
+          const newToken = await refreshAccessToken();
           setToken(newToken);
           scheduleRefresh(newToken);
           const meRes = await axios.get(`${API_URL}/auth/me`, {
@@ -92,34 +91,44 @@ export function AuthProvider({ children }) {
   }
 
   async function login(email, password) {
-    const res = await axios.post(`${API_URL}/auth/login`, { email, password }, { withCredentials: true });
+    const res = await axios.post(
+      `${API_URL}/auth/login`,
+      { email, password },
+      { withCredentials: true },
+    );
     const { token: accessToken, user: userData } = res.data;
-    localStorage.setItem('token', accessToken);
+    localStorage.setItem("token", accessToken);
     setToken(accessToken);
     setUser(userData);
-    scheduleRefresh(accessToken);
+    //scheduleRefresh(accessToken);
     return res.data;
   }
 
   async function register(data) {
-    const res = await axios.post(`${API_URL}/auth/register`, data, { withCredentials: true });
+    const res = await axios.post(`${API_URL}/auth/register`, data, {
+      withCredentials: true,
+    });
     const { token: accessToken, user: userData } = res.data;
-    localStorage.setItem('token', accessToken);
+    localStorage.setItem("token", accessToken);
     setToken(accessToken);
     setUser(userData);
-    scheduleRefresh(accessToken);
+    //scheduleRefresh(accessToken);
     return res.data;
   }
 
   async function logout() {
     try {
       await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     _clearAuth();
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, fetchUser }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, login, register, logout, fetchUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -127,6 +136,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be inside AuthProvider');
+  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
   return ctx;
 }

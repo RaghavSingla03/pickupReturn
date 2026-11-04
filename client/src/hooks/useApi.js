@@ -1,14 +1,8 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
+import { refreshAccessToken } from '../lib/refreshToken.js';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-async function tryRefreshToken() {
-  const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-  const newToken = res.data.token;
-  localStorage.setItem('token', newToken);
-  return newToken;
-}
 
 export function useApi() {
   const [loading, setLoading] = useState(false);
@@ -36,7 +30,7 @@ export function useApi() {
       // On 401 attempt a silent token refresh, then retry once
       if (err.response?.status === 401 && !_isRetry) {
         try {
-          const newToken = await tryRefreshToken();
+          const newToken = await refreshAccessToken();
           const retryRes = await axios({
             method,
             url: `${API_URL}${url}`,

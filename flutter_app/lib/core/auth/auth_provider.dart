@@ -107,7 +107,7 @@ class AuthProvider extends ChangeNotifier {
       final r = await ApiClient.instance.dio.post('/auth/send-otp', data: {
         'email': email.trim(),
       });
-      if (r.statusCode == 200) return null;
+      if (r.statusCode) return null;
       return extractResponseError(r);
     } on DioException catch (e) {
       return extractError(e);

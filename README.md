@@ -2,7 +2,7 @@
 
 **Website:** [trucksreturn.com](https://trucksreturn.com)
 
-A full-stack freight marketplace that connects truck drivers with shippers to **eliminate empty backhauls**. Drivers register a truck, declare a return route (current location → destination), and the platform matches them with loads available *along the entire route* — not just the origin city. Built mobile-first for Indian truck drivers.
+A full-stack freight marketplace that connects truck drivers with shippers to **eliminate empty backhauls**. Drivers register a truck, declare a return route (current location → destination), and the platform matches them with loads available _along the entire route_ — not just the origin city. Built mobile-first for Indian truck drivers.
 
 ---
 
@@ -15,6 +15,7 @@ A truck dropping a delivery in Kochi and heading back to Bangalore typically ret
 ## Tech stack
 
 **Backend** (`server/`)
+
 - Node.js + Express (ESM modules)
 - PostgreSQL via `pg` (node-postgres) — no ORM
 - JWT access tokens (15 min) + httpOnly refresh-token cookies (30 days, rotating)
@@ -25,6 +26,7 @@ A truck dropping a delivery in Kochi and heading back to Bangalore typically ret
 - Multer for document uploads
 
 **Frontend** (`client/`)
+
 - React 18 + Vite
 - React Router v6
 - Tailwind CSS
@@ -96,6 +98,7 @@ Truck/
 ## Quick start
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL 13+
 - `openssl` (for generating secrets)
@@ -127,6 +130,7 @@ ADMIN_PASSWORD=<generate with: openssl rand -base64 12>
 ```
 
 The server **refuses to boot** if:
+
 - `NODE_ENV` is unset
 - `JWT_SECRET` is unset, a known placeholder, or shorter than 32 characters
 - (production only) `ADMIN_PASSWORD` is missing, weak, or shorter than 12 characters
@@ -163,6 +167,7 @@ cd ../server && npm start     # Express serves the bundle and the API
 ## How a typical session flows
 
 ### Driver journey
+
 1. **Register** → email OTP verification → choose role `driver` → JWT issued.
 2. **Register truck** → upload RC, permit, insurance, PUC, licence, three vehicle photos → admin verifies in `/admin/driver-verification`.
 3. **Set availability** → enter current city + destination + (optionally) declared free capacity for less-than-truckload (LTL) loads → status `active`.
@@ -171,6 +176,7 @@ cd ../server && npm start     # Express serves the bundle and the API
 6. **Rate the shipper** once delivered.
 
 ### Shipper journey
+
 1. Register → choose role `shipper`.
 2. Post a load (pickup + delivery cities and full addresses, weight, cargo type, offered price, handling instructions).
 3. Wait for a driver to book it. Get a notification (in-app bell + email) on every status change.
@@ -178,6 +184,7 @@ cd ../server && npm start     # Express serves the bundle and the API
 5. Rate the driver once delivered.
 
 ### Admin journey
+
 - `/admin/login` (separate creds from `.env`) → dashboard with bookings, users, loads, driver verification, settings.
 - Settings let an operator change site name, logo, **favicon**, theme palette, SMTP credentials, security toggles (rate limiting, OTP enforcement) — no redeploy.
 
@@ -224,7 +231,7 @@ Driver app pushes `POST /api/bookings/:uuid/track` every 15s with `{lat, lng}`. 
 - `POST /api/auth/send-otp` → email OTP (10 min expiry).
 - `POST /api/auth/register` → verifies OTP, creates user, issues access + refresh tokens.
 - `POST /api/auth/login` → password check, issues both tokens.
-- `POST /api/auth/refresh` → rotates the refresh-token cookie, returns a fresh access token.
+- `POST /api/auth/refresh` → requires the refresh-token cookie issued by login/register, rotates it, and returns a fresh access token. The client shares concurrent refresh attempts so a single-use token is not refreshed twice at once.
 - `POST /api/auth/logout` → invalidates the current refresh token in the DB.
 - `POST /api/auth/forgot-password` + `/reset-password` → OTP-gated password reset that also invalidates all existing sessions.
 
@@ -236,17 +243,17 @@ The `useApi` hook in `client/src/hooks/useApi.js` automatically silently refresh
 
 All endpoints are prefixed with `/api`.
 
-| Group | Routes |
-| --- | --- |
-| Auth | `POST /auth/send-otp`, `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `GET /auth/me` |
-| Drivers | `POST /drivers/truck` (register / edit), `POST /drivers/availability`, `GET /drivers/availability`, `GET /drivers/profile`, `GET /drivers/matches` |
-| Loads | `POST /loads`, `GET /loads` (filter by city, cargo, status), `GET /loads/:uuid`, `PUT /loads/:uuid`, `DELETE /loads/:uuid` |
-| Bookings | `POST /bookings`, `GET /bookings/:uuid`, `PUT /bookings/:uuid/status`, `POST /bookings/:uuid/track`, **`GET /bookings/:uuid/track/stream`** (SSE), `POST /bookings/:uuid/rate`, `GET /bookings/shipper` |
-| Documents | `POST /documents` (Multer, 5 MB limit, image-only) |
-| Notifications | `GET /notifications`, `PUT /notifications/:id/read` |
-| Admin | `/admin/users`, `/admin/loads`, `/admin/bookings`, `/admin/driver-verification`, etc. |
-| Settings | `GET /settings` (public-safe keys), `PUT /admin/settings` |
-| Health | `GET /health` |
+| Group         | Routes                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth          | `POST /auth/send-otp`, `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `GET /auth/me`                                                |
+| Drivers       | `POST /drivers/truck` (register / edit), `POST /drivers/availability`, `GET /drivers/availability`, `GET /drivers/profile`, `GET /drivers/matches`                                                      |
+| Loads         | `POST /loads`, `GET /loads` (filter by city, cargo, status), `GET /loads/:uuid`, `PUT /loads/:uuid`, `DELETE /loads/:uuid`                                                                              |
+| Bookings      | `POST /bookings`, `GET /bookings/:uuid`, `PUT /bookings/:uuid/status`, `POST /bookings/:uuid/track`, **`GET /bookings/:uuid/track/stream`** (SSE), `POST /bookings/:uuid/rate`, `GET /bookings/shipper` |
+| Documents     | `POST /documents` (Multer, 5 MB limit, image-only)                                                                                                                                                      |
+| Notifications | `GET /notifications`, `PUT /notifications/:id/read`                                                                                                                                                     |
+| Admin         | `/admin/users`, `/admin/loads`, `/admin/bookings`, `/admin/driver-verification`, etc.                                                                                                                   |
+| Settings      | `GET /settings` (public-safe keys), `PUT /admin/settings`                                                                                                                                               |
+| Health        | `GET /health`                                                                                                                                                                                           |
 
 ---
 
@@ -257,6 +264,7 @@ PostgreSQL, accessed via a pooled `pg` client in `server/db/db.js`.
 Schema lives in `server/db/schema.sql`; idempotent column-additions and table-additions live in `runMigrations()` and run on every server start.
 
 Key tables:
+
 - `users` (driver / shipper / admin)
 - `trucks` (per-driver, with `is_verified`)
 - `driver_availability` (`available_capacity_tons` for LTL)
@@ -285,3 +293,15 @@ Indexes exist on `loads(status)`, lat/lng, `driver_availability(status)`, and bo
 ## License
 
 MIT — see `LICENSE`.
+
+Shipper
+shipper@returnload.com
+Shipper@123
+
+Driver
+driver@returnload.com
+Driver@123
+
+psql -U postgres -h localhost -d returnload -f seed.sql
+
+psql -U postgres -h localhost -d returnload -f seed_live_marketplace.sql
